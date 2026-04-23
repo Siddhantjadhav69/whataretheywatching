@@ -107,7 +107,7 @@ export default async function SearchPage({
             Back to Home
           </Link>
         </div>
-        <h1 className="mb-8 text-3xl font-black text-zinc-100">Search Results for "{q}"</h1>
+        <h1 className="mb-8 text-3xl font-black text-zinc-100">Search Results for &quot;{q}&quot;</h1>
         
         <div className="mb-8 flex gap-4 border-b border-zinc-800">
           <Link

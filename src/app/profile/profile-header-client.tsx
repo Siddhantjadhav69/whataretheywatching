@@ -70,7 +70,7 @@ function SettingsModal({ isOpen, onClose, currentAvatarUrl, currentBio, username
         <DialogHeader>
           <DialogTitle className="text-xl font-black text-zinc-100">Profile Settings</DialogTitle>
           <DialogDescription className="text-zinc-400">
-            Make changes to your profile here. Click save when you're done.
+            Make changes to your profile here. Click save when you&apos;re done.
           </DialogDescription>
         </DialogHeader>
 

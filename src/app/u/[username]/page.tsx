@@ -165,7 +165,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
         <div className="rounded-lg border border-zinc-800 bg-zinc-900">
           <div className="border-b border-zinc-800 p-6">
             <h2 className="text-xl font-black text-zinc-100">Media Library</h2>
-            <p className="mt-1 text-sm text-zinc-400">@{user.username}'s tracked media</p>
+            <p className="mt-1 text-sm text-zinc-400">@{user.username}&apos;s tracked media</p>
           </div>
           
           <ProfileTabs items={mediaItems} initialTab="WATCHING" isReadOnly={true} hideAiPicks={true} />
