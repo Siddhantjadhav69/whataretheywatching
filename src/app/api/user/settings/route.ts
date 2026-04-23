@@ -5,6 +5,8 @@ import { authOptions } from "@/lib/auth";
 import { isDatabaseConnectionError } from "@/lib/database-errors";
 import { prisma } from "@/lib/prisma";
 
+export const dynamic = "force-dynamic";
+
 const UpdateProfileSchema = z.object({
   avatarUrl: z.string().url("Invalid avatar URL").optional(),
   bio: z.string().max(500, "Bio must be at most 500 characters").optional()

@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { generatePersonalizedRecommendations } from "@/lib/recommendations";
 import { searchTmdbMedia } from "@/lib/tmdb";
 
+export const dynamic = "force-dynamic";
+
 async function getAuthenticatedUser() {
   const session = await getServerSession(authOptions);
   const email = session?.user?.email;
