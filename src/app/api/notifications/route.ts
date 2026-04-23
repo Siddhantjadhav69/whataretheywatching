@@ -18,8 +18,8 @@ export async function GET(request: Request) {
 
     const currentUserId = session.user.id;
 
-    // Fetch recent MediaList items from users we follow
-    const recentActivity = await prisma.mediaList.findMany({
+    // Track updates from users that the current user follows.
+    const recentTrackActivity = await prisma.mediaList.findMany({
       where: {
         user: {
           followers: {
@@ -30,13 +30,14 @@ export async function GET(request: Request) {
         }
       },
       orderBy: {
-        // We lack a createdAt field on MediaList in the prisma schema, wait, let me check the schema briefly.
-        id: "desc" // using id descending as proxy for recent insertion
+        // MediaList currently has no createdAt field, so id is used as a proxy ordering.
+        id: "desc"
       },
       take,
       include: {
         user: {
           select: {
+            id: true,
             username: true,
             avatarUrl: true
           }
@@ -44,7 +45,71 @@ export async function GET(request: Request) {
       }
     });
 
-    return NextResponse.json({ notifications: recentActivity });
+    // New follower events (people who followed the current user).
+    const recentFollowerEvents = await prisma.connection.findMany({
+      where: {
+        followingId: currentUserId
+      },
+      orderBy: {
+        createdAt: "desc"
+      },
+      take,
+      include: {
+        follower: {
+          select: {
+            id: true,
+            username: true,
+            avatarUrl: true
+          }
+        }
+      }
+    });
+
+    const followBackSet = new Set(
+      (
+        await prisma.connection.findMany({
+          where: {
+            followerId: currentUserId,
+            followingId: {
+              in: recentFollowerEvents.map((event) => event.follower.id)
+            }
+          },
+          select: {
+            followingId: true
+          }
+        })
+      ).map((connection) => connection.followingId)
+    );
+
+    const notifications = [
+      ...recentFollowerEvents.map((event) => ({
+        id: `follow-${event.id}`,
+        type: "NEW_FOLLOWER" as const,
+        createdAt: event.createdAt,
+        user: {
+          id: event.follower.id,
+          username: event.follower.username,
+          avatarUrl: event.follower.avatarUrl
+        },
+        isFollowingBack: followBackSet.has(event.follower.id)
+      })),
+      ...recentTrackActivity.map((item) => ({
+        id: `track-${item.id}`,
+        type: "TRACK_UPDATE" as const,
+        createdAt: null,
+        user: {
+          id: item.user.id,
+          username: item.user.username,
+          avatarUrl: item.user.avatarUrl
+        },
+        title: item.title,
+        status: item.status,
+        mediaType: item.mediaType,
+        tmdbId: item.tmdbId
+      }))
+    ].slice(0, take);
+
+    return NextResponse.json({ notifications });
   } catch (error) {
     console.error("Notifications error:", error);
     return new NextResponse("Internal Server Error", { status: 500 });

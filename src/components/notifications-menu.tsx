@@ -11,12 +11,17 @@ import {
 import { getStatusMeta, TrackingStatusValue } from "@/lib/status";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
+import { toast } from "sonner";
 
 type Notification = {
   id: string;
-  title: string;
-  status: TrackingStatusValue;
+  type: "TRACK_UPDATE" | "NEW_FOLLOWER";
+  title?: string;
+  status?: TrackingStatusValue;
+  mediaType?: string;
+  isFollowingBack?: boolean;
   user: {
+    id: string;
     username: string;
     avatarUrl: string | null;
   };
@@ -24,7 +29,38 @@ type Notification = {
 
 export function NotificationsMenu() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [pendingFollowBack, setPendingFollowBack] = useState<string | null>(null);
   const { data: session } = useSession();
+
+  async function followBack(targetUserId: string) {
+    setPendingFollowBack(targetUserId);
+    try {
+      const response = await fetch("/api/friends/follow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ targetUserId })
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to follow back right now.");
+      }
+
+      setNotifications((current) =>
+        current.map((notification) =>
+          notification.type === "NEW_FOLLOWER" && notification.user.id === targetUserId
+            ? { ...notification, isFollowingBack: true }
+            : notification
+        )
+      );
+      toast.success("Followed back successfully.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to follow back right now.");
+    } finally {
+      setPendingFollowBack(null);
+    }
+  }
 
   useEffect(() => {
     if (session?.user?.id) {
@@ -83,7 +119,7 @@ export function NotificationsMenu() {
         ) : (
           <div className="py-2">
             {notifications.map((notif) => {
-              const statusMeta = getStatusMeta(notif.status);
+              const statusMeta = notif.status ? getStatusMeta(notif.status) : null;
               return (
                 <DropdownMenuItem key={notif.id} className="focus:bg-zinc-800 p-3 rounded-none flex items-start gap-3 cursor-pointer border-b border-zinc-900">
                   <div className="h-8 w-8 rounded-full overflow-hidden shrink-0 bg-zinc-800 grid place-items-center text-xs font-bold text-zinc-400">
@@ -94,16 +130,43 @@ export function NotificationsMenu() {
                     )}
                   </div>
                   <div className="flex-1 space-y-1">
-                    <p className="text-[13px] leading-tight text-white/80">
-                      <Link href={`/u/${notif.user.username}`} className="font-bold text-white hover:underline">
-                        @{notif.user.username}
-                      </Link>{" "}
-                      added{" "}
-                      <span className="font-semibold text-zinc-300">{notif.title}</span>{" "}
-                      to their {" "}
-                      <span className="font-semibold text-zinc-300">{statusMeta.label.toLowerCase()}</span>
-                      {" "}list.
-                    </p>
+                    {notif.type === "NEW_FOLLOWER" ? (
+                      <>
+                        <p className="text-[13px] leading-tight text-white/80">
+                          <Link href={`/u/${notif.user.username}`} className="font-bold text-white hover:underline">
+                            @{notif.user.username}
+                          </Link>{" "}
+                          started following you.
+                        </p>
+                        {!notif.isFollowingBack ? (
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              void followBack(notif.user.id);
+                            }}
+                            disabled={pendingFollowBack === notif.user.id}
+                            className="mt-1 rounded-md border border-flame/30 bg-flame/20 px-2 py-1 text-[11px] font-bold text-flame transition hover:bg-flame/30 disabled:cursor-wait disabled:opacity-70"
+                          >
+                            {pendingFollowBack === notif.user.id ? "Following..." : "Follow Back"}
+                          </button>
+                        ) : (
+                          <p className="text-[11px] font-semibold text-mint">Following each other</p>
+                        )}
+                      </>
+                    ) : (
+                      <p className="text-[13px] leading-tight text-white/80">
+                        <Link href={`/u/${notif.user.username}`} className="font-bold text-white hover:underline">
+                          @{notif.user.username}
+                        </Link>{" "}
+                        added{" "}
+                        <span className="font-semibold text-zinc-300">{notif.title}</span>{" "}
+                        to their {" "}
+                        <span className="font-semibold text-zinc-300">{statusMeta?.label.toLowerCase()}</span>
+                        {" "}list.
+                      </p>
+                    )}
                   </div>
                 </DropdownMenuItem>
               );

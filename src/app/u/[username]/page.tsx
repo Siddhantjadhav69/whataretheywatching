@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { AppNav } from "@/components/app-nav";
 import { FollowButton } from "@/components/follow-button";
 import { ProfileTabs } from "@/components/profile-tabs";
@@ -19,6 +19,10 @@ type PublicProfilePageProps = {
 export default async function PublicProfilePage({ params }: PublicProfilePageProps) {
   const session = await getServerSession(authOptions);
   const currentUserId = session?.user?.id;
+
+  if (session?.user?.username && session.user.username === params.username) {
+    redirect("/profile");
+  }
 
   let user = null;
   try {
@@ -170,7 +174,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
             <p className="mt-1 text-sm text-zinc-400">@{user.username}&apos;s tracked media</p>
           </div>
           
-          <ProfileTabs items={mediaItems} initialTab="WATCHING" isReadOnly={true} hideAiPicks={true} />
+          <ProfileTabs items={mediaItems} initialTab="WATCHING" isReadOnly={true} hideAiPicks={true} hideActivity={true} />
         </div>
       </section>
     </main>

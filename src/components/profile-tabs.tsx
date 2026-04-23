@@ -4,6 +4,7 @@ import Image from "next/image";
 import { AnimatePresence, motion } from "framer-motion";
 import { Loader2, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { ProfileMediaCard, type ProfileMediaItem, type ProfileMediaStatus } from "@/components/profile-media-card";
 import { ReadOnlyProfileMediaCard } from "@/components/read-only-profile-media-card";
 import { cn } from "@/lib/utils";
@@ -18,11 +19,26 @@ type AiPick = {
   posterPath?: string | null;
 };
 
+type ActivityItem = {
+  id: string;
+  type: "TRACK_UPDATE" | "NEW_FOLLOWER";
+  title?: string;
+  status?: string;
+  mediaType?: string;
+  isFollowingBack?: boolean;
+  user: {
+    id: string;
+    username: string;
+    avatarUrl: string | null;
+  };
+};
+
 type ProfileTabsProps = {
   items: ProfileMediaItem[];
   initialTab?: string;
   isReadOnly?: boolean;
   hideAiPicks?: boolean;
+  hideActivity?: boolean;
 };
 
 const tabs: Array<{ value: ProfileTab; label: string }> = [
@@ -36,8 +52,16 @@ const tabs: Array<{ value: ProfileTab; label: string }> = [
   { value: "activity", label: "Friend Activity" }
 ];
 
-function getAvailableTabs(hideAiPicks: boolean) {
-  return tabs.filter(tab => !hideAiPicks || tab.value !== "picks");
+function getAvailableTabs(hideAiPicks: boolean, hideActivity: boolean) {
+  return tabs.filter((tab) => {
+    if (hideAiPicks && tab.value === "picks") {
+      return false;
+    }
+    if (hideActivity && tab.value === "activity") {
+      return false;
+    }
+    return true;
+  });
 }
 
 function normalizeTab(tab?: string): ProfileTab {
@@ -64,15 +88,17 @@ function aiPosterUrl(path?: string | null) {
   return path ? `https://image.tmdb.org/t/p/w342${path}` : null;
 }
 
-export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks = false }: ProfileTabsProps) {
+export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks = false, hideActivity = false }: ProfileTabsProps) {
   const [activeTab, setActiveTab] = useState<ProfileTab>(normalizeTab(initialTab));
+  const availableTabs = getAvailableTabs(hideAiPicks, hideActivity || isReadOnly);
   const [mediaItems, setMediaItems] = useState(items);
   const [aiPicks, setAiPicks] = useState<AiPick[]>([]);
   const [isLoadingPicks, setIsLoadingPicks] = useState(false);
   const [picksError, setPicksError] = useState<string | null>(null);
 
-  const [activityFeed, setActivityFeed] = useState<any[]>([]);
+  const [activityFeed, setActivityFeed] = useState<ActivityItem[]>([]);
   const [isLoadingActivity, setIsLoadingActivity] = useState(false);
+  const [pendingFollowBack, setPendingFollowBack] = useState<string | null>(null);
 
   const visibleItems = useMemo(() => {
     if (activeTab === "all") {
@@ -123,11 +149,41 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
         return;
       }
       const data = await response.json();
-      setActivityFeed(data.notifications || []);
+      setActivityFeed((data.notifications || []) as ActivityItem[]);
     } catch {
       setActivityFeed([]);
     } finally {
       setIsLoadingActivity(false);
+    }
+  }
+
+  async function handleFollowBack(targetUserId: string) {
+    setPendingFollowBack(targetUserId);
+    try {
+      const response = await fetch("/api/friends/follow", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ targetUserId })
+      });
+
+      if (!response.ok) {
+        throw new Error("Unable to follow back right now.");
+      }
+
+      setActivityFeed((current) =>
+        current.map((notification) =>
+          notification.type === "NEW_FOLLOWER" && notification.user.id === targetUserId
+            ? { ...notification, isFollowingBack: true }
+            : notification
+        )
+      );
+      toast.success("Followed back successfully.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Unable to follow back right now.");
+    } finally {
+      setPendingFollowBack(null);
     }
   }
 
@@ -140,6 +196,12 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
     }
   }, [activeTab, aiPicks.length, isLoadingPicks, isLoadingActivity]);
 
+  useEffect(() => {
+    if (!availableTabs.some((tab) => tab.value === activeTab)) {
+      setActiveTab("all");
+    }
+  }, [activeTab, availableTabs]);
+
   function updateUrl(nextTab: ProfileTab) {
     const query = nextTab === "picks" ? "?tab=picks" : nextTab === "all" ? "?tab=lists" : `?tab=${nextTab}`;
     window.history.replaceState(null, "", `/profile${query}`);
@@ -147,7 +209,9 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
 
   function handleTabChange(nextTab: ProfileTab) {
     setActiveTab(nextTab);
-    updateUrl(nextTab);
+    if (!isReadOnly) {
+      updateUrl(nextTab);
+    }
   }
 
   function handleStatusChange(id: string, status: ProfileMediaStatus) {
@@ -173,7 +237,7 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
   return (
     <section className="space-y-6">
       <div className="hide-scrollbar flex gap-2 overflow-x-auto rounded-lg border border-white/10 bg-white/[0.045] p-1">
-        {getAvailableTabs(hideAiPicks).map((tab) => {
+        {availableTabs.map((tab) => {
           const isActive = activeTab === tab.value;
 
           return (
@@ -280,7 +344,7 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {activityFeed.map((notif: any) => (
+                  {activityFeed.map((notif) => (
                     <div key={notif.id} className="flex items-center gap-4 rounded-lg border border-white/10 bg-white/[0.03] p-4 transition hover:bg-white/[0.06]">
                       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full bg-black/50">
                         {notif.user.avatarUrl ? (
@@ -292,17 +356,39 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
                         )}
                       </div>
                       <div className="flex-1">
-                        <p className="text-sm text-white/80">
-                          <span className="font-bold text-white">@{notif.user.username}</span> added{" "}
-                          <span className="font-semibold text-zinc-300">{notif.title}</span> to their list.
-                        </p>
-                        <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-white/50">
-                          <span className="inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
-                            {notif.mediaType}
-                          </span>
-                          <span>•</span>
-                          <span>Status: {notif.status.replace(/_/g, " ")}</span>
-                        </p>
+                        {notif.type === "NEW_FOLLOWER" ? (
+                          <>
+                            <p className="text-sm text-white/80">
+                              <span className="font-bold text-white">@{notif.user.username}</span> started following you.
+                            </p>
+                            {!notif.isFollowingBack ? (
+                              <button
+                                type="button"
+                                onClick={() => void handleFollowBack(notif.user.id)}
+                                disabled={pendingFollowBack === notif.user.id}
+                                className="mt-2 rounded-md border border-flame/30 bg-flame/20 px-3 py-1.5 text-xs font-bold text-flame transition hover:bg-flame/30 disabled:cursor-wait disabled:opacity-70"
+                              >
+                                {pendingFollowBack === notif.user.id ? "Following..." : "Follow Back"}
+                              </button>
+                            ) : (
+                              <p className="mt-1 text-xs font-semibold text-mint">Following each other</p>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-sm text-white/80">
+                              <span className="font-bold text-white">@{notif.user.username}</span> added{" "}
+                              <span className="font-semibold text-zinc-300">{notif.title}</span> to their list.
+                            </p>
+                            <p className="mt-1 flex items-center gap-2 text-xs font-semibold text-white/50">
+                              <span className="inline-flex rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider">
+                                {notif.mediaType}
+                              </span>
+                              <span>•</span>
+                              <span>Status: {notif.status?.replace(/_/g, " ")}</span>
+                            </p>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
