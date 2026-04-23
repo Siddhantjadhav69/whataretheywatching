@@ -60,20 +60,38 @@ const GENRES = {
   ]
 };
 
-const SORT_OPTIONS = [
-  { value: "popularity.desc", label: "Popularity (High to Low)" },
-  { value: "popularity.asc", label: "Popularity (Low to High)" },
-  { value: "vote_average.desc", label: "Rating (High to Low)" },
-  { value: "vote_average.asc", label: "Rating (Low to High)" },
-  { value: "release_date.desc", label: "Newest" },
-  { value: "release_date.asc", label: "Oldest" }
-];
+function getSortOptions(mediaType: "movie" | "tv") {
+  if (mediaType === "movie") {
+    return [
+      { value: "popularity.desc", label: "Most Popular" },
+      { value: "vote_average.desc", label: "Top Rated" },
+      { value: "primary_release_date.desc", label: "New Releases" },
+      { value: "primary_release_date.asc", label: "Old Classics" },
+      { value: "revenue.desc", label: "Highest Box Office" },
+      { value: "vote_count.desc", label: "Most Reviewed" }
+    ];
+  }
 
-const QUICK_LINKS: Array<{ label: string; params: Record<string, string> }> = [
-  { label: "Trending Today", params: { sort_by: "popularity.desc" } },
-  { label: "Top Rated", params: { sort_by: "vote_average.desc" } },
-  { label: "Highest Rated", params: { sort_by: "vote_average.desc" } }
-];
+  return [
+    { value: "popularity.desc", label: "Most Popular" },
+    { value: "vote_average.desc", label: "Top Rated" },
+    { value: "first_air_date.desc", label: "Recently Aired" },
+    { value: "first_air_date.asc", label: "Oldest Premieres" },
+    { value: "vote_count.desc", label: "Most Reviewed" },
+    { value: "popularity.asc", label: "Hidden Gems" }
+  ];
+}
+
+function getQuickLinks(mediaType: "movie" | "tv") {
+  return [
+    { label: "Trending Now", params: { sort_by: "popularity.desc" } },
+    { label: "Top Rated", params: { sort_by: "vote_average.desc" } },
+    {
+      label: mediaType === "movie" ? "New Releases" : "Recently Aired",
+      params: { sort_by: mediaType === "movie" ? "primary_release_date.desc" : "first_air_date.desc" }
+    }
+  ] as Array<{ label: string; params: Record<string, string> }>;
+}
 
 type DiscoverFiltersProps = {
   mediaType: "movie" | "tv";
@@ -88,6 +106,8 @@ export function DiscoverFilters({ mediaType }: DiscoverFiltersProps) {
   const currentLanguage = searchParams.get("language");
   const currentGenres = searchParams.get("genres");
   const currentSort = searchParams.get("sort_by") || "popularity.desc";
+  const sortOptions = getSortOptions(mediaType);
+  const quickLinks = getQuickLinks(mediaType);
   const genres = GENRES[mediaType];
 
   const updateFilter = useCallback(
@@ -186,7 +206,7 @@ export function DiscoverFilters({ mediaType }: DiscoverFiltersProps) {
 
           {/* Quick Links */}
           <div className="space-y-2 mb-6">
-            {QUICK_LINKS.map((link) => (
+            {quickLinks.map((link) => (
               <button
                 key={link.label}
                 onClick={() => {
@@ -200,9 +220,9 @@ export function DiscoverFilters({ mediaType }: DiscoverFiltersProps) {
                 }}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-semibold text-white/70 hover:bg-white/10 hover:text-white transition"
               >
-                {link.label === "Trending Today" && <TrendingUp className="h-4 w-4" />}
+                {link.label === "Trending Now" && <TrendingUp className="h-4 w-4" />}
                 {link.label === "Top Rated" && <Trophy className="h-4 w-4" />}
-                {link.label === "Highest Rated" && <Star className="h-4 w-4" />}
+                {(link.label === "New Releases" || link.label === "Recently Aired") && <Star className="h-4 w-4" />}
                 {link.label}
               </button>
             ))}
@@ -221,7 +241,7 @@ export function DiscoverFilters({ mediaType }: DiscoverFiltersProps) {
             onChange={(e) => updateFilter("sort_by", e.target.value)}
             className="w-full px-3 py-2 rounded-lg border border-white/10 bg-white/5 text-sm font-semibold text-white hover:border-white/20 focus:border-flame/50 focus:outline-none transition"
           >
-            {SORT_OPTIONS.map((option) => (
+            {sortOptions.map((option) => (
               <option key={option.value} value={option.value} className="bg-zinc-900 text-white">
                 {option.label}
               </option>

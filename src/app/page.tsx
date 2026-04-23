@@ -39,6 +39,7 @@ export default async function DashboardPage() {
   let heroStatus: any = null;
   let initials = "US";
   let usernameDisplay = "User";
+  let listHealthMetrics: Array<{ label: string; value: string }> = [];
 
   let lists: any[] = [];
 
@@ -54,11 +55,23 @@ export default async function DashboardPage() {
     const completed = lists.filter(m => m.status === "COMPLETED").length;
     const watching = lists.filter(m => m.status === "WATCHING").length;
     const planToWatch = lists.filter(m => m.status === "PLAN_TO_WATCH").length;
+    const dropped = lists.filter(m => m.status === "DROPPED").length;
+    const completionRate = lists.length > 0 ? Math.round((completed / lists.length) * 100) : 0;
+    const activeTracking = lists.length > 0 ? Math.round((watching / lists.length) * 100) : 0;
+    const backlogLoad = lists.length > 0 ? Math.round((planToWatch / lists.length) * 100) : 0;
+    const dropRate = lists.length > 0 ? Math.round((dropped / lists.length) * 100) : 0;
 
     userStats = [
       { label: "Completed", value: completed.toString() },
       { label: "Watching", value: watching.toString() },
       { label: "Plan", value: planToWatch.toString() }
+    ];
+
+    listHealthMetrics = [
+      { label: "Completion Rate", value: `${completionRate}%` },
+      { label: "Active Tracking", value: `${activeTracking}%` },
+      { label: "Backlog Load", value: `${backlogLoad}%` },
+      { label: "Drop Rate", value: `${dropRate}%` }
     ];
 
     const heroMedia = lists.find(m => m.tmdbId === 693134);
@@ -223,11 +236,7 @@ export default async function DashboardPage() {
             <section className="rounded-lg border border-white/10 bg-white/[0.045] p-5">
               <h2 className="text-xl font-black text-white">List Health</h2>
               <div className="mt-5 space-y-4">
-                {[
-                  ["Sci-Fi", "72%"],
-                  ["Drama", "54%"],
-                  ["Thriller", "39%"]
-                ].map(([label, value]) => (
+                {listHealthMetrics.length ? listHealthMetrics.map(({ label, value }) => (
                   <div key={label}>
                     <div className="mb-2 flex justify-between text-sm font-bold">
                       <span className="text-white/70">{label}</span>
@@ -237,7 +246,11 @@ export default async function DashboardPage() {
                       <div className="h-full rounded-full bg-flame" style={{ width: value }} />
                     </div>
                   </div>
-                ))}
+                )) : (
+                  <div className="rounded-lg border border-white/10 bg-black/25 p-3 text-sm text-white/60">
+                    Add titles to your list to see health metrics.
+                  </div>
+                )}
               </div>
             </section>
           </aside>

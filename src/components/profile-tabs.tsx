@@ -8,7 +8,7 @@ import { ProfileMediaCard, type ProfileMediaItem, type ProfileMediaStatus } from
 import { ReadOnlyProfileMediaCard } from "@/components/read-only-profile-media-card";
 import { cn } from "@/lib/utils";
 
-type ProfileTab = "all" | "WATCHING" | "COMPLETED" | "PLAN_TO_WATCH" | "DROPPED" | "picks" | "activity";
+type ProfileTab = "favorites" | "all" | "WATCHING" | "COMPLETED" | "PLAN_TO_WATCH" | "DROPPED" | "picks" | "activity";
 
 type AiPick = {
   title: string;
@@ -26,6 +26,7 @@ type ProfileTabsProps = {
 };
 
 const tabs: Array<{ value: ProfileTab; label: string }> = [
+  { value: "favorites", label: "★ Favorites" },
   { value: "all", label: "All" },
   { value: "WATCHING", label: "Watching" },
   { value: "COMPLETED", label: "Completed" },
@@ -52,7 +53,11 @@ function normalizeTab(tab?: string): ProfileTab {
     return "activity";
   }
 
-  return tabs.some((item) => item.value === tab) ? (tab as ProfileTab) : "all";
+  if (tab === "favorites") {
+    return "favorites";
+  }
+
+  return tabs.some((item) => item.value === tab) ? (tab as ProfileTab) : "favorites";
 }
 
 function aiPosterUrl(path?: string | null) {
@@ -76,6 +81,10 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
 
     if (activeTab === "picks" || activeTab === "activity") {
       return [];
+    }
+
+    if (activeTab === "favorites") {
+      return mediaItems.filter((item) => item.isFavorite);
     }
 
     return mediaItems.filter((item) => item.status === activeTab);
@@ -109,10 +118,14 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
     setIsLoadingActivity(true);
     try {
       const response = await fetch("/api/notifications?limit=30");
+      if (!response.ok) {
+        setActivityFeed([]);
+        return;
+      }
       const data = await response.json();
       setActivityFeed(data.notifications || []);
     } catch {
-      // Ignore
+      setActivityFeed([]);
     } finally {
       setIsLoadingActivity(false);
     }
@@ -122,10 +135,10 @@ export function ProfileTabs({ items, initialTab, isReadOnly = false, hideAiPicks
     if (activeTab === "picks" && !aiPicks.length && !isLoadingPicks) {
       void loadAiPicks();
     }
-    if (activeTab === "activity" && !activityFeed.length && !isLoadingActivity) {
+    if (activeTab === "activity" && !isLoadingActivity) {
       void loadActivity();
     }
-  }, [activeTab, aiPicks.length, isLoadingPicks, activityFeed.length, isLoadingActivity]);
+  }, [activeTab, aiPicks.length, isLoadingPicks, isLoadingActivity]);
 
   function updateUrl(nextTab: ProfileTab) {
     const query = nextTab === "picks" ? "?tab=picks" : nextTab === "all" ? "?tab=lists" : `?tab=${nextTab}`;

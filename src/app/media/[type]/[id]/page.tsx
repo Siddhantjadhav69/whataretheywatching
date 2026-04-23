@@ -1,169 +1,234 @@
-import Image from "next/image";
-import { notFound } from "next/navigation";
-import { Calendar, Clock, Play, Star } from "lucide-react";
-import { AppNav } from "@/components/app-nav";
-import { CastCarousel } from "@/components/cast-carousel";
-import { TrackButton } from "@/components/track-button";
-import { Badge } from "@/components/ui/badge";
-import { getBestTrailer, getTmdbMediaDetails, tmdbImage, type TmdbMediaType } from "@/lib/tmdb";
+"use client";
 
-type MediaDetailsPageProps = {
-  params: {
-    type: string;
-    id: string;
-  };
+import Image from "next/image";
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { Star, Clock, Calendar, Film, ArrowLeft, Loader2 } from "lucide-react";
+import { MediaDetailActions } from "@/components/media-detail-actions";
+import { ReviewSection } from "@/components/review-section";
+
+type TmdbData = {
+  title?: string;
+  name?: string;
+  overview?: string;
+  poster_path?: string;
+  backdrop_path?: string;
+  release_date?: string;
+  first_air_date?: string;
+  runtime?: number;
+  episode_run_time?: number[];
+  vote_average?: number;
+  genres?: { id: number; name: string }[];
+  credits?: { cast: { id: number; name: string; character: string; profile_path: string | null }[] };
 };
 
-function isMediaType(type: string): type is TmdbMediaType {
-  return type === "movie" || type === "tv";
-}
+type ReviewData = {
+  id: string;
+  content: string;
+  rating: number;
+  createdAt: string;
+  user: { id: string; username: string; avatarUrl: string | null };
+};
 
-function getTitle(media: Awaited<ReturnType<typeof getTmdbMediaDetails>>) {
-  return media.title ?? media.name ?? "Untitled";
-}
+export default function MediaDetailPage({ params }: { params: { type: string; id: string } }) {
+  const { type, id } = params;
+  const [data, setData] = useState<TmdbData | null>(null);
+  const [reviews, setReviews] = useState<ReviewData[]>([]);
+  const [tracking, setTracking] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | undefined>();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
 
-function getYear(media: Awaited<ReturnType<typeof getTmdbMediaDetails>>) {
-  const date = media.release_date ?? media.first_air_date;
-  return date ? new Date(date).getFullYear() : "TBA";
-}
+  const tmdbId = parseInt(id, 10);
 
-function getRuntime(media: Awaited<ReturnType<typeof getTmdbMediaDetails>>, type: TmdbMediaType) {
-  if (type === "movie") {
-    return media.runtime ? `${media.runtime} min` : "Runtime TBA";
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        // Fetch TMDB data via our proxy
+        const tmdbRes = await fetch(`/api/tmdb/${type}/${id}`);
+        if (tmdbRes.ok) {
+          setData(await tmdbRes.json());
+        } else {
+          setError(true);
+        }
+
+        // Fetch reviews
+        const reviewRes = await fetch(`/api/reviews?tmdbId=${id}&friendsOnly=true`);
+        if (reviewRes.ok) {
+          const revData = await reviewRes.json();
+          setReviews(revData.reviews || []);
+        }
+
+        // Fetch session
+        const sessionRes = await fetch("/api/auth/session");
+        if (sessionRes.ok) {
+          const session = await sessionRes.json();
+          setCurrentUserId(session?.user?.id);
+        }
+      } catch {
+        setError(true);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, [type, id]);
+
+  if (loading) {
+    return (
+      <main className="min-h-screen bg-ink text-white flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 className="h-10 w-10 animate-spin text-flame mx-auto" />
+          <p className="text-zinc-400 text-sm">Loading details...</p>
+        </div>
+      </main>
+    );
   }
 
-  const episodeRuntime = media.episode_run_time?.[0];
-  const seasons = media.number_of_seasons ? `${media.number_of_seasons} season${media.number_of_seasons > 1 ? "s" : ""}` : null;
-
-  if (episodeRuntime && seasons) {
-    return `${episodeRuntime} min episodes / ${seasons}`;
-  }
-
-  return episodeRuntime ? `${episodeRuntime} min episodes` : seasons ?? "Runtime TBA";
-}
-
-export default async function MediaDetailsPage({ params }: MediaDetailsPageProps) {
-  const id = Number(params.id);
-
-  if (!isMediaType(params.type) || Number.isNaN(id)) {
-    notFound();
-  }
-
-  const media = await getTmdbMediaDetails(params.type, id);
-  const title = getTitle(media);
-  const year = getYear(media);
-  const runtime = getRuntime(media, params.type);
-  const poster = tmdbImage(media.poster_path, "w500");
-  const backdrop = tmdbImage(media.backdrop_path, "original");
-  const trailer = getBestTrailer(media.videos.results);
-
-  return (
-    <main className="min-h-screen bg-ink pb-24 lg:pb-0">
-      <AppNav />
-
-      <section className="relative min-h-[680px] overflow-hidden">
-        {backdrop ? (
-          <Image
-            src={backdrop}
-            alt={`${title} backdrop`}
-            fill
-            priority
-            sizes="100vw"
-            className="object-cover"
-          />
-        ) : (
-          <div className="absolute inset-0 bg-panel" />
-        )}
-        <div className="absolute inset-0 bg-gradient-to-b from-ink/20 via-ink/70 to-ink" />
-        <div className="absolute inset-0 bg-gradient-to-r from-ink via-ink/70 to-ink/10" />
-
-        <div className="relative mx-auto grid min-h-[680px] max-w-7xl items-end gap-8 px-4 pb-12 pt-24 sm:px-6 md:grid-cols-[240px_minmax(0,1fr)] md:items-center md:pb-16 lg:px-8">
-          <div className="relative mx-auto aspect-[2/3] w-48 overflow-hidden rounded-lg border border-white/10 bg-panel shadow-2xl shadow-black/50 md:mx-0 md:w-full">
-            {poster ? (
-              <Image
-                src={poster}
-                alt={`${title} poster`}
-                fill
-                priority
-                sizes="(max-width: 768px) 192px, 240px"
-                className="object-cover"
-              />
-            ) : (
-              <div className="grid h-full place-items-center text-sm font-bold text-white/35">No Poster</div>
-            )}
-          </div>
-
-          <div className="max-w-3xl space-y-6 text-center md:text-left">
-            <div className="flex flex-wrap justify-center gap-2 md:justify-start">
-              <Badge className="border-flame/30 bg-flame/15 text-flame">{params.type === "movie" ? "Movie" : "Series"}</Badge>
-              {media.genres.slice(0, 3).map((genre) => (
-                <Badge key={genre.id}>{genre.name}</Badge>
-              ))}
-            </div>
-
-            <div className="space-y-4">
-              <h1 className="text-5xl font-black leading-[0.95] tracking-normal text-white sm:text-6xl lg:text-8xl">{title}</h1>
-              <div className="flex flex-wrap justify-center gap-3 text-sm font-bold text-white/75 md:justify-start">
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 backdrop-blur">
-                  <Calendar className="h-4 w-4 text-flame" />
-                  {year}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 backdrop-blur">
-                  <Star className="h-4 w-4 fill-gold text-gold" />
-                  {media.vote_average.toFixed(1)}
-                </span>
-                <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-black/35 px-3 py-2 backdrop-blur">
-                  <Clock className="h-4 w-4 text-mint" />
-                  {runtime}
-                </span>
-              </div>
-              <p className="mx-auto max-w-2xl text-base leading-7 text-white/[0.68] md:mx-0">{media.overview}</p>
-            </div>
-            <div className="flex justify-center md:justify-start">
-              <TrackButton
-                tmdbId={media.id}
-                mediaType={params.type}
-                title={title}
-                posterPath={media.poster_path}
-                initialStatus={null}
-              />
-            </div>
+  if (error || !data) {
+    return (
+      <main className="min-h-screen bg-ink text-white flex items-center justify-center">
+        <div className="text-center space-y-4 max-w-md px-4">
+          <div className="text-6xl">🎬</div>
+          <h1 className="text-2xl font-black">Couldn&apos;t load this title</h1>
+          <p className="text-zinc-400">The movie database is temporarily unreachable.</p>
+          <div className="flex justify-center gap-3 mt-4">
+            <button onClick={() => window.location.reload()} className="rounded-lg bg-flame px-6 py-2.5 text-sm font-bold text-white hover:bg-[#ff674d] transition">
+              Try Again
+            </button>
+            <Link href="/discover" className="rounded-lg border border-zinc-700 px-6 py-2.5 text-sm font-bold text-zinc-300 hover:bg-zinc-800 transition">
+              Back to Discover
+            </Link>
           </div>
         </div>
-      </section>
+      </main>
+    );
+  }
 
-      <section className="mx-auto max-w-7xl space-y-10 px-4 py-10 sm:px-6 lg:px-8">
-        {trailer ? (
-          <section className="space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="grid h-10 w-10 place-items-center rounded-lg bg-flame text-white">
-                <Play className="h-5 w-5 fill-current" />
-              </div>
-              <div>
-                <p className="text-xs font-bold uppercase tracking-[0.18em] text-flame">Trailer</p>
-                <h2 className="text-2xl font-black text-white">{trailer.name}</h2>
-              </div>
-            </div>
-            <div className="aspect-video overflow-hidden rounded-lg border border-white/10 bg-panel shadow-2xl shadow-black/40">
-              <iframe
-                title={`${title} trailer`}
-                src={`https://www.youtube.com/embed/${trailer.key}`}
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                className="h-full w-full"
-              />
-            </div>
-          </section>
-        ) : null}
+  const title = data.title || data.name || "Unknown";
+  const releaseDate = data.release_date || data.first_air_date;
+  const year = releaseDate ? new Date(releaseDate).getFullYear() : null;
+  const runtime = data.runtime || (data.episode_run_time?.[0]) || null;
+  const genres = data.genres?.map(g => g.name) || [];
+  const cast = data.credits?.cast?.slice(0, 8) || [];
+  const backdrop = data.backdrop_path ? `https://image.tmdb.org/t/p/w1280${data.backdrop_path}` : null;
+  const poster = data.poster_path ? `https://image.tmdb.org/t/p/w500${data.poster_path}` : null;
+  const voteAverage = data.vote_average ? data.vote_average.toFixed(1) : null;
 
-        <section className="space-y-4">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-flame">Cast</p>
-            <h2 className="mt-1 text-2xl font-black text-white">Top billed</h2>
+  return (
+    <main className="min-h-screen bg-ink text-white">
+      {/* Hero Backdrop */}
+      <div className="relative h-[50vh] w-full overflow-hidden">
+        {backdrop ? (
+          <Image src={backdrop} alt="" fill className="object-cover" priority />
+        ) : (
+          <div className="h-full w-full bg-gradient-to-b from-zinc-800 to-ink" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-ink/80 to-transparent" />
+
+        {/* Back button */}
+        <Link href="/discover" className="absolute top-6 left-6 z-20 flex items-center gap-2 rounded-full bg-black/50 backdrop-blur-sm px-4 py-2 text-sm font-bold text-white hover:bg-black/70 transition">
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+      </div>
+
+      {/* Content */}
+      <div className="relative -mt-48 mx-auto max-w-6xl px-4 pb-20">
+        <div className="flex flex-col md:flex-row gap-8">
+          {/* Poster */}
+          <div className="shrink-0 w-[220px] self-start">
+            <div className="relative aspect-[2/3] overflow-hidden rounded-xl border-2 border-zinc-800 shadow-2xl">
+              {poster ? (
+                <Image src={poster} alt={title} fill className="object-cover" />
+              ) : (
+                <div className="h-full w-full bg-zinc-900 grid place-items-center text-zinc-600 font-bold text-sm text-center p-4">{title}</div>
+              )}
+            </div>
           </div>
-          <CastCarousel cast={media.credits.cast} />
-        </section>
-      </section>
+
+          {/* Info */}
+          <div className="flex-1 space-y-6">
+            <div>
+              <div className="flex flex-wrap items-center gap-3 mb-2">
+                <span className="inline-flex rounded-full bg-flame/20 px-2.5 py-0.5 text-xs font-black uppercase tracking-wider text-flame">
+                  {type === "tv" ? "TV Series" : "Movie"}
+                </span>
+                {voteAverage && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-400/15 px-2.5 py-0.5 text-xs font-bold text-amber-400">
+                    <Star className="h-3 w-3 fill-amber-400" /> {voteAverage}
+                  </span>
+                )}
+              </div>
+              <h1 className="text-3xl md:text-4xl font-black">{title}</h1>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-zinc-400">
+                {year && <span className="flex items-center gap-1"><Calendar className="h-3.5 w-3.5" /> {year}</span>}
+                {runtime && <span className="flex items-center gap-1"><Clock className="h-3.5 w-3.5" /> {runtime} min</span>}
+                {genres.length > 0 && <span className="flex items-center gap-1"><Film className="h-3.5 w-3.5" /> {genres.join(", ")}</span>}
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <MediaDetailActions
+              tmdbId={tmdbId}
+              mediaType={type}
+              title={title}
+              posterPath={data.poster_path || null}
+              initialTracking={tracking}
+            />
+
+            {/* Overview */}
+            {data.overview && (
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-2">Overview</h2>
+                <p className="text-sm leading-7 text-zinc-300">{data.overview}</p>
+              </div>
+            )}
+
+            {/* Cast */}
+            {cast.length > 0 && (
+              <div>
+                <h2 className="text-sm font-bold uppercase tracking-widest text-zinc-500 mb-3">Top Cast</h2>
+                <div className="flex gap-3 overflow-x-auto pb-2 hide-scrollbar">
+                  {cast.map((person) => (
+                    <div key={person.id} className="shrink-0 text-center w-16">
+                      <div className="relative h-16 w-16 rounded-full overflow-hidden bg-zinc-800 mx-auto">
+                        {person.profile_path ? (
+                          <Image
+                            src={`https://image.tmdb.org/t/p/w185${person.profile_path}`}
+                            alt={person.name}
+                            fill
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="h-full w-full grid place-items-center text-xs text-zinc-500 font-bold">
+                            {person.name.slice(0, 2)}
+                          </div>
+                        )}
+                      </div>
+                      <p className="mt-1.5 text-[11px] font-bold text-zinc-300 truncate">{person.name}</p>
+                      <p className="text-[10px] text-zinc-500 truncate">{person.character}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Reviews Section */}
+        <div className="mt-12">
+          <ReviewSection
+            tmdbId={tmdbId}
+            mediaType={type}
+            title={title}
+            reviews={reviews}
+            currentUserId={currentUserId}
+          />
+        </div>
+      </div>
     </main>
   );
 }

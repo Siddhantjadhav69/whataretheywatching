@@ -56,7 +56,9 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
     mediaType: item.mediaType === "tv" ? "tv" : "movie",
     title: item.title,
     posterPath: item.posterPath,
-    status: item.status
+    status: item.status,
+    isFavorite: (item as any).isFavorite ?? false,
+    rating: (item as any).rating ?? null
   }));
 
   const groupedByStatus = statuses.reduce<Record<ProfileMediaStatus, ProfileMediaItem[]>>((groups, status) => {

@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Check, ChevronDown, Loader2, Trash2 } from "lucide-react";
+import { Check, ChevronDown, Heart, Loader2, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import {
@@ -23,6 +23,8 @@ export type ProfileMediaItem = {
   title: string;
   posterPath: string | null;
   status: ProfileMediaStatus;
+  isFavorite?: boolean;
+  rating?: number | null;
 };
 
 type ProfileMediaCardProps = {
@@ -61,6 +63,26 @@ async function trackRequest(method: "PATCH" | "DELETE", body: Record<string, unk
 
 export function ProfileMediaCard({ item, onStatusChange, onRemove, onRestore }: ProfileMediaCardProps) {
   const [isPending, setIsPending] = useState(false);
+  const [isFav, setIsFav] = useState(item.isFavorite ?? false);
+
+  async function handleFavorite(e: React.MouseEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      const res = await fetch("/api/track/favorite", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tmdbId: item.tmdbId })
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setIsFav(data.isFavorite);
+        toast.success(data.isFavorite ? "Added to favorites!" : "Removed from favorites.");
+      }
+    } catch {
+      toast.error("Failed to toggle favorite.");
+    }
+  }
   const poster = posterUrl(item.posterPath);
   const activeLabel = statusOptions.find((option) => option.value === item.status)?.label ?? "Change Status";
 
@@ -113,6 +135,13 @@ export function ProfileMediaCard({ item, onStatusChange, onRemove, onRestore }: 
           <div className="grid h-full place-items-center p-4 text-center text-sm font-black text-white/35">{item.title}</div>
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent opacity-0 transition duration-300 group-hover:opacity-100" />
+        {/* Favorite heart badge */}
+        <button
+          onClick={handleFavorite}
+          className={`absolute top-2 right-2 z-10 rounded-full p-1.5 transition ${isFav ? "bg-pink-500/30" : "bg-black/50 opacity-0 group-hover:opacity-100"}`}
+        >
+          <Heart className={`h-4 w-4 ${isFav ? "fill-pink-400 text-pink-400" : "text-white"}`} />
+        </button>
       </Link>
 
       <div className="relative -mt-24 flex min-h-24 flex-col justify-end gap-3 p-3 opacity-0 transition duration-300 group-hover:opacity-100">

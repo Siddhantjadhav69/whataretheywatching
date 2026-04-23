@@ -141,13 +141,15 @@ async function DiscoverGrid({ mediaType, filters }: { mediaType: TmdbMediaType; 
         mockResults.sort((a, b) => b.vote_average - a.vote_average);
       } else if (filters.sort_by === "vote_average.asc") {
         mockResults.sort((a, b) => a.vote_average - b.vote_average);
-      } else if (filters.sort_by === "release_date.desc") {
+      } else if (filters.sort_by === "release_date.desc" || filters.sort_by === "primary_release_date.desc" || filters.sort_by === "first_air_date.desc") {
         mockResults.sort((a, b) => new Date(b.release_date).getTime() - new Date(a.release_date).getTime());
-      } else if (filters.sort_by === "release_date.asc") {
+      } else if (filters.sort_by === "release_date.asc" || filters.sort_by === "primary_release_date.asc" || filters.sort_by === "first_air_date.asc") {
         mockResults.sort((a, b) => new Date(a.release_date).getTime() - new Date(b.release_date).getTime());
       } else if (filters.sort_by === "popularity.asc") {
         // Just reverse array roughly mapping to ascending
         mockResults.reverse();
+      } else if (filters.sort_by === "vote_count.desc" || filters.sort_by === "revenue.desc") {
+        mockResults.sort((a, b) => b.vote_average - a.vote_average);
       }
 
       data = {
@@ -205,11 +207,13 @@ async function DiscoverGrid({ mediaType, filters }: { mediaType: TmdbMediaType; 
             return (
               <div key={item.id} className="group min-w-[158px] overflow-hidden rounded-lg border border-white/10 bg-white/[0.045] shadow-2xl shadow-black/25 transition duration-300 hover:-translate-y-1 hover:border-flame/40 hover:bg-white/[0.07] sm:min-w-0">
                 <div className="relative aspect-[2/3] overflow-hidden bg-panel">
-                  <img
-                    src={posterUrl}
-                    alt={`${title} poster`}
-                    className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
-                  />
+                  <Link href={`/media/${mediaType}/${item.id}`} className="block h-full w-full">
+                    <img
+                      src={posterUrl}
+                      alt={`${title} poster`}
+                      className="h-full w-full object-cover transition duration-500 group-hover:scale-105"
+                    />
+                  </Link>
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black via-black/45 to-transparent p-2.5">
                     <MediaCardTrackButton
                       tmdbId={item.id}
@@ -220,23 +224,25 @@ async function DiscoverGrid({ mediaType, filters }: { mediaType: TmdbMediaType; 
                     />
                   </div>
                 </div>
-                <div className="space-y-2 p-3">
-                  <div>
-                    <h3 className="line-clamp-1 text-sm font-bold text-white">{title}</h3>
-                    <p className="mt-1 text-xs text-white/55">
-                      {kind} • {year}
-                    </p>
+                <Link href={`/media/${mediaType}/${item.id}`} className="block">
+                  <div className="space-y-2 p-3">
+                    <div>
+                      <h3 className="line-clamp-1 text-sm font-bold text-white">{title}</h3>
+                      <p className="mt-1 text-xs text-white/55">
+                        {kind} • {year}
+                      </p>
+                    </div>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="line-clamp-1 text-xs text-white/50">{genres.join(", ")}</span>
+                      <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-1 text-xs font-bold text-gold">
+                        <svg className="h-3 w-3 fill-current" viewBox="0 0 24 24">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                        </svg>
+                        {rating}
+                      </span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="line-clamp-1 text-xs text-white/50">{genres.join(", ")}</span>
-                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-gold/15 px-2 py-1 text-xs font-bold text-gold">
-                      <svg className="h-3 w-3 fill-current" viewBox="0 0 24 24">
-                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                      </svg>
-                      {rating}
-                    </span>
-                  </div>
-                </div>
+                </Link>
               </div>
             );
           })}
