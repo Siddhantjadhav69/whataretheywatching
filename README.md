@@ -53,8 +53,3 @@ A modern, responsive, and dynamic full-stack Next.js web application designed to
    npm run dev
    ```
 
-## Protecting Core API Secrets explicitly
-During standard deployment over GitHub, your `.env` folder is heavily guarded inside your `.gitignore` array. Meaning Next.js implicitly prevents any of your local keys from ever leaking into your GitHub public repos. When transferring this code architecture natively over production hosting like `Vercel` or `Railway`:
-1. Use the Host Provider's absolute native Dashboard (Like Vercel Project Settings -> Environment Variables)
-2. Manually copy and paste each key value locally from your `.env` right into their isolated Cloud Variable pipelines natively.
-3. Once completed, your live deployed servers inherently map those external secrets without ever exposing them physically via URL!
